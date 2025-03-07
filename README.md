@@ -7,12 +7,60 @@ Start the server:
 cargo run
 ```
 
-Hit the Transcription endpoint:
+Basic Endpoints:
 ```
-curl http://localhost:3000/transcribe
+   # Hello World test
+   curl "http://localhost:3000/hello"
+
+   # Get media info
+   curl "http://localhost:3000/media/info"
 ```
 
-or with Whisper Manually:
+Audio Processing Endpoints:
+```
+# Split video into chunks
+curl "http://localhost:3000/split"
+
+# Merge chunks back together
+curl "http://localhost:3000/merge"
+
+# Split specific region
+curl "http://localhost:3000/split-region"
+```
+
+# Transcription & Content Generation Endpoints
+
+````
+# Basic transcription with segments
+curl "http://localhost:3000/transcribe"
+
+# Transcription with full text and stats
+curl "http://localhost:3000/transcribe-to-json"
+
+# Transcribe and generate YouTube content
+# Med Man Sports (default)
+curl "http://localhost:3000/transcribe-and-optimize"
+
+# Mama Meditations
+curl "http://localhost:3000/transcribe-and-optimize?template=mama-meditations"
+```
+
+# Content Generation Endpoints
+```
+# Test with sample text (Med Man Sports)
+curl "http://localhost:3000/generate?template=med-man-sports"
+
+# Test with sample text (Mama Meditations)
+curl "http://localhost:3000/generate?template=mama-meditations"
+```
+
+Chat
+```
+# Simple chat endpoint
+curl "http://localhost:3000/chat?text=your_text_here"
+```
+
+ Whisper Manually:
 ```
 
 ```

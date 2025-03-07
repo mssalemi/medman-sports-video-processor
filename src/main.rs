@@ -1,15 +1,21 @@
 mod ffmpeg;
 mod whisper;
+mod openai;
 
 use axum::{
     routing::get,
     Router,
     response::Json,
+    extract::Query,
 };
 use serde_json::{json, Value};
 use ffmpeg::FFmpegClient;
 use whisper::WhisperClient;
 use std::path::PathBuf;
+use openai::OpenAIClient;
+use serde::Deserialize;
+use dotenv::dotenv;
+use openai::PromptTemplate;
 
 async fn hello() -> Json<Value> {
     println!("Hello, World!");
@@ -186,8 +192,141 @@ async fn transcribe_to_json() -> Json<Value> {
     }))
 }
 
+#[derive(Deserialize)]
+struct TranscribeQuery {
+    template: Option<String>,
+}
+
+async fn transcribe_and_optimize(Query(params): Query<TranscribeQuery>) -> Json<Value> {
+    let current_dir = std::env::current_dir().expect("Failed to get current directory");
+    let input_path = current_dir.join("src").join("video.mov");
+
+    println!("Looking for file at: {:?}", input_path);
+    
+    if !input_path.exists() {
+        println!("File not found!");
+        return Json(json!({
+            "error": "File not found",
+            "path": input_path.to_str()
+        }));
+    }
+
+    // First, transcribe the video
+    let whisper = WhisperClient::new();
+    let transcription = match whisper.transcribe(&input_path) {
+        Ok(t) => t,
+        Err(e) => {
+            return Json(json!({
+                "error": "Transcription failed",
+                "details": e.to_string()
+            }));
+        }
+    };
+
+    // Combine all segments into one text
+    let full_text: String = transcription.segments
+        .iter()
+        .map(|segment| segment.text.clone())
+        .collect::<Vec<String>>()
+        .join(" ");
+
+    // Then optimize the content using OpenAI
+    let openai = OpenAIClient::new()
+        .expect("Failed to create OpenAI client");
+
+    let template = match params.template.as_deref() {
+        Some("mama-meditations") => PromptTemplate::MamaMeditations,
+        Some("med-man-sports") => PromptTemplate::MedManSports,
+        _ => PromptTemplate::MedManSports,
+    };
+
+    match openai.generate_youtube_content(&full_text, template).await {
+        Ok(response) => {
+            match serde_json::from_str::<Value>(&response) {
+                Ok(content) => Json(content),
+                Err(e) => {
+                    println!("Failed to parse response as JSON: {}", e);
+                    Json(json!({
+                        "error": "Failed to parse YouTube content",
+                        "raw_response": response
+                    }))
+                }
+            }
+        },
+        Err(e) => {
+            println!("YouTube content generation failed: {}", e);
+            Json(json!({
+                "error": format!("YouTube content generation failed: {}", e)
+            }))
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct PromptQuery {
+    text: String,
+}
+
+async fn chat(Query(params): Query<PromptQuery>) -> Json<Value> {
+    let client = OpenAIClient::new()
+        .expect("Failed to create OpenAI client");
+
+    match client.complete(&params.text).await {
+        Ok(response) => Json(json!({
+            "response": response
+        })),
+        Err(e) => Json(json!({
+            "error": e.to_string()
+        }))
+    }
+}
+
+#[derive(Deserialize)]
+struct GenerateQuery {
+    template: Option<String>,
+}
+
+async fn generate_test_content(Query(params): Query<GenerateQuery>) -> Json<Value> {
+    let client = OpenAIClient::new()
+        .expect("Failed to create OpenAI client");
+
+    println!("Starting YouTube content generation..."); 
+
+    let test_transcript = "Okay, what is up Medman Sports? Today we're talking about tennis serves...";
+
+    let template = match params.template.as_deref() {
+        Some("mama-meditations") => PromptTemplate::MamaMeditations,
+        Some("med-man-sports") => PromptTemplate::MedManSports,
+        _ => PromptTemplate::MedManSports,
+    };
+
+    match client.generate_youtube_content(test_transcript, template).await {
+        Ok(response) => {
+            match serde_json::from_str::<Value>(&response) {
+                Ok(content) => Json(content),
+                Err(e) => {
+                    println!("Failed to parse response as JSON: {}", e);
+                    Json(json!({
+                        "error": "Failed to parse YouTube content",
+                        "raw_response": response
+                    }))
+                }
+            }
+        },
+        Err(e) => {
+            println!("YouTube content generation failed: {}", e);
+            Json(json!({
+                "error": format!("YouTube content generation failed: {}", e)
+            }))
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    // Load environment variables from .env file
+    dotenv().ok();
+
     // Build our router
     let app = Router::new()
         .route("/hello", get(hello))
@@ -196,7 +335,10 @@ async fn main() {
         .route("/merge", get(merge_chunks))
         .route("/split-region", get(split_region))
         .route("/transcribe", get(transcribe))
-        .route("/transcribe-to-json", get(transcribe_to_json));
+        .route("/transcribe-to-json", get(transcribe_to_json))
+        .route("/transcribe-and-optimize", get(transcribe_and_optimize))
+        .route("/chat", get(chat))
+        .route("/generate", get(generate_test_content));
 
     // Run the server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();

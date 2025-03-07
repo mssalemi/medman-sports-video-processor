@@ -5,3 +5,6 @@ Cargo.lock
 /src/chunks/*
 /src/videos/*
 /src/audio.mp3
+.env
+/src/video.mov
+./prompt-dev
