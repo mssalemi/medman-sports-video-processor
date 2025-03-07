@@ -1,4 +1,4 @@
-use std::process::{Command, Output};
+use std::process::{Command};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -83,23 +83,6 @@ impl FFmpegClient {
         };
 
         Ok(info)
-    }
-
-    pub fn parse_info(output: &Output) -> MediaInfo {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        
-        let duration = stderr
-            .lines()
-            .find(|line| line.contains("Duration:"))
-            .and_then(|line| line.split("Duration: ").nth(1))
-            .and_then(|time| time.split(',').next())
-            .unwrap_or("unknown");
-
-        MediaInfo {
-            duration: duration.to_string(),
-            bitrate: "128 kb/s".to_string(),  // We can parse this too
-            format: "mp3".to_string(),
-        }
     }
 
     pub fn split_into_chunks(&self) -> Result<Vec<PathBuf>, std::io::Error> {

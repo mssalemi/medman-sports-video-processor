@@ -2,6 +2,22 @@
 
 A Rust web service that provides FFmpeg functionality through HTTP endpoints. This project demonstrates various Rust concepts through practical implementation of audio file processing.
 
+Start the server:
+```
+cargo run
+```
+
+Hit the Transcription endpoint:
+```
+curl http://localhost:3000/transcribe
+```
+
+or with Whisper Manually:
+```
+
+```
+
+
 ## Features
 - Get media file information
 - Split audio files into chunks

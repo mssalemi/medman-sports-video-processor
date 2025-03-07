@@ -1,4 +1,5 @@
 mod ffmpeg;
+mod whisper;
 
 use axum::{
     routing::get,
@@ -7,6 +8,7 @@ use axum::{
 };
 use serde_json::{json, Value};
 use ffmpeg::FFmpegClient;
+use whisper::WhisperClient;
 use std::path::PathBuf;
 
 async fn hello() -> Json<Value> {
@@ -112,6 +114,37 @@ async fn split_region() -> Json<Value> {
     }))
 }
 
+async fn transcribe() -> Json<Value> {
+    let current_dir = std::env::current_dir().expect("Failed to get current directory");
+    let input_path = current_dir.join("src").join("video.mov");
+
+    println!("Looking for file at: {:?}", input_path);
+    
+    // Verify file exists
+    if !input_path.exists() {
+        println!("File not found!");
+        return Json(json!({
+            "error": "File not found",
+            "path": input_path.to_str()
+        }));
+    }
+
+    let whisper = WhisperClient::new();
+    let transcription = whisper
+        .transcribe(&input_path)
+        .expect("Failed to transcribe audio");
+
+    Json(json!({
+        "segments": transcription.segments.iter().map(|segment| {
+            json!({
+                "start": segment.start,
+                "end": segment.end,
+                "text": segment.text
+            })
+        }).collect::<Vec<_>>()
+    }))
+}
+
 #[tokio::main]
 async fn main() {
     // Build our router
@@ -120,7 +153,8 @@ async fn main() {
         .route("/media/info", get(media_info))
         .route("/split", get(split_video))
         .route("/merge", get(merge_chunks))
-        .route("/split-region", get(split_region));
+        .route("/split-region", get(split_region))
+        .route("/transcribe", get(transcribe));
 
     // Run the server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
