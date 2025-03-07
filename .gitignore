@@ -7,4 +7,5 @@ Cargo.lock
 /src/audio.mp3
 .env
 /src/video.mov
+/src/video2.mov
 ./prompt-dev
